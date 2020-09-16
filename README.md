@@ -2,6 +2,10 @@
 
 A toy inspired by the concept of dynamic link library introduced in CSAPP 3e chapter 7.
 
+## Usage
+
+See [cscript_test.py](cscript_test.py) for usage.
+
 ## Clone
 
 ```shell
