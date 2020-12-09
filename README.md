@@ -22,4 +22,7 @@ pytest
 
 In fact, running pytest may raise Segmentation fault. However, csript_test.py works individually. I have no idea.
 
-Feel free to correct my English, code and others. Thanks!
+## License
+
+MIT
+
