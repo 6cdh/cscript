@@ -4,7 +4,7 @@ A toy inspired by the concept of dynamic link library introduced in CSAPP 3e cha
 
 ## Usage
 
-See [cscript_test.py](cscript_test.py) for usage.
+See [test_cscript.py](test_cscript.py) for usage.
 
 ## Clone
 
@@ -17,10 +17,6 @@ git clone https://github.com/6cdh/inline_C_in_Python.git
 ```shell
 pytest
 ```
-
-## Known Issues
-
-In fact, running pytest may raise Segmentation fault. However, csript_test.py works individually. I have no idea.
 
 ## License
 

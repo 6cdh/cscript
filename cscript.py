@@ -9,25 +9,49 @@ import shutil
 
 
 class C:
-
     cc = distutils.ccompiler.new_compiler()
-    dir = "__cscriptcache__"
-    __instances = {}
+    cache_dir = "__cscriptcache__"
+    libs = {}
 
-    def __init__(self, code: str, name: str = "cscript"):
-        self.code = code
-        self.name = name
-        self.__dl = None
-        if name in C.__instances:
-            self.__dl = C.__instances[name].__dl
-        else:
-            C.__instances[name] = self
+    @staticmethod
+    def exist_dl(name):
+        if name in C.libs:
+            return C.libs[name].__dl
+        return None
 
-    def update(self, code):
+    @staticmethod
+    def clean():
+        """
+        Close all dynamic libraries and remove cscript cache
+        """
+        C.libs.clear()
+        shutil.rmtree(C.cache_dir, ignore_errors=True)
+
+    def __init__(self, name: str, code: str):
+        self.__code = code
+        self.__name = name
+        self.__src_path = ""
+        self.__lib_path = ""
+        self.__dl = C.exist_dl(self.__name)
+        self.lib = None
+
+    def __del__(self):
+        self.__dlclose()
+        self.__dldelete()
+        if not C.libs:
+            shutil.rmtree(C.cache_dir, ignore_errors=True)
+
+    def update(self, code: str):
         """
         Update C code
         """
-        self.code = code
+        self.__code = code
+
+    def append(self, code: str):
+        """
+        Append C code
+        """
+        self.__code += code
 
     def compile(self, cc=None, flags=["-fPIC", "-O2"]):
         """
@@ -40,30 +64,47 @@ class C:
 
         Example
         -------
-        >>>C('int a();').compile()
+        >>>src = C('int a() { return 1; }'); obj = src.compile()
 
         Return
         ------
         object
         """
-        if cc is None:
+        if not cc:
             cc = C.cc
-        C.__check_path()
-        dir = C.dir
-        src = os.path.join(dir, self.name + ".c")
-        sharedlib_name = cc.library_filename(self.name, "shared")
-        lib = os.path.join(dir, sharedlib_name)
 
-        with open(src, "w") as f:
-            f.write(self.code)
+        if self.__dl:
+            self.__dlclose()
+            self.__dldelete()
 
-        objs = cc.compile([src], extra_postargs=flags)
+        dir_path = C.cache_dir
+        src_path = os.path.join(dir_path, self.__name + ".c")
+        self.__src_path = src_path
+        lib_name = cc.library_filename(self.__name, "shared")
+        lib_path = os.path.join(dir_path, lib_name)
+        self.__lib_path = lib_path
+
+        os.makedirs(dir_path, exist_ok=True)
+
+        with open(src_path, "w") as f:
+            f.write(self.__code)
+
+        objs = cc.compile([src_path], extra_postargs=flags)
+        cc.link_shared_lib(objs, self.__name, output_dir=dir_path)
+        self.__dlopen(lib_path)
+        self.lib = self.__dl
+
+        return self.lib
+
+    def __dldelete(self):
         try:
-            os.remove(lib)
+            os.remove(self.__src_path)
         except FileNotFoundError:
             pass
-        cc.link_shared_lib(objs, self.name, output_dir=dir)
-        return self.__dlopen(lib)
+        try:
+            os.remove(self.__lib_path)
+        except FileNotFoundError:
+            pass
 
     def __dlopen(self, lib: str):
         self.__dlclose()
@@ -72,23 +113,10 @@ class C:
 
     # See https://stackoverflow.com/questions/50964033/forcing-ctypes-cdll-loadlibrary-to-reload-library-from-file
     def __dlclose(self):
-        if self.__dl is not None:
+        if self.__dl:
             dlclose_func = ctypes.CDLL(None).dlclose
             dlclose_func.argtypes = [ctypes.c_void_p]
             dlclose_func.restype = ctypes.c_int
             dlclose_func(self.__dl._handle)
-        self.__dl = None
-
-    @staticmethod
-    def __check_path():
-        os.makedirs(C.dir, exist_ok=True)
-
-    @classmethod
-    def clean(cls):
-        """
-        Close all dynamic libraries and remove cscript cache
-        """
-        for _, instance in cls.__instances.items():
-            instance.__dlclose()
-        cls.__instances = {}
-        shutil.rmtree(C.dir)
+            self.__dl = None
+            self.lib = None
